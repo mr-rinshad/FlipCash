@@ -5,6 +5,7 @@ import '../core/constants/app_colors.dart';
 import '../core/constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import 'home/home_dashboard_screen.dart';
+import 'admin/admin_dashboard_screen.dart';
 import 'auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -48,9 +49,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     if (authProvider.isAuthenticated) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),
-      );
+      if (authProvider.isAdmin) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),
+        );
+      }
     } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const LoginScreen()),

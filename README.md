@@ -10,13 +10,22 @@ It directly connects:
 
 ---
 
-## 🚀 Key Features Built
+## 🚀 Key Features & Changes
 
 ### 1. 🔐 Authentication & Trust Module
-- **Supabase Auth with Google Sign-In:** Configured with PKCE auth flow.
-- **Email & Password Authentication:** Sign-up, Sign-in, and password reset capability.
-- **Instant Demo Logins:** One-tap testing as regular user (`Rahul Sharma`) or Lead Admin (`FlipCash Moderator`).
-- **User Reputation & Trust Score (0-100%):** Calculates trust score based on phone verification, successful physical handovers, and 5-star ratings.
+- **Supabase Auth & Google Sign-In:** Configured with PKCE auth flow.
+- **Dedicated Admin Account:**
+  - Email: `rinshad@flipcash.com`
+  - Password: `123456`
+  - Directs automatically to the **Admin Dashboard** (`AdminDashboardScreen`).
+- **Regular Users:**
+  - Register with full name, email, phone number, and password.
+  - **Post-Registration Flow:** Upon successful registration, users are automatically guided back to the Login screen with a confirmation message, where they enter their credentials to sign in.
+  - Directed to the **User Dashboard** (`HomeDashboardScreen`).
+- **Profile Picture Upload & Capture:**
+  - Take photo with camera or choose from gallery directly on device via `image_picker`.
+  - Stored in the Supabase `avatars` bucket with public URL.
+- **Separation of Roles:** Admin controls and user dashboard are strictly separated by login credentials. No "Switch to Admin" switch on the profile page.
 
 ### 2. 📢 Availability & Intent Publishing (Core Feature)
 - **Two Exchange Modes:**
@@ -31,6 +40,7 @@ It directly connects:
   - Safety checklist acknowledgement.
 
 ### 3. 🎯 Smart Search, Radar Discovery & Live Peer Navigation
+- **Clean Slate Database:** No pre-baked dummy seed users or listings. Real requests created by actual users appear dynamically.
 - **Interactive Proximity Radar View:**
   - Custom canvas radar visualization with pulsing distance rings (1 km, 3 km, 5 km, 10 km).
   - Real-time peer blips dynamically positioned by GPS coordinates.
@@ -47,10 +57,12 @@ It directly connects:
   - Real-time messaging to coordinate meeting points (*"I am wearing a blue jacket near the cafe counter"*).
 
 ### 4. 🛡️ Admin Dashboard & Moderation
+- Access reserved for `rinshad@flipcash.com`.
 - **Platform Analytics:** Active listings count, total active cash liquidity (₹), registered user base, and pending reports.
 - **Listings Moderation:** Review and delete suspicious or policy-violating listings.
 - **User Management:** Inspect user profiles, verify badges, or suspend/ban fraudulent users.
 - **Safety Reports Management:** Review reported incidents, investigate disputes, and record moderation actions.
+- **Sign Out Action:** Direct sign-out button in the Admin AppBar.
 
 ---
 
@@ -60,7 +72,7 @@ It directly connects:
 FlipCash/
 ├── .env                              # Supabase URL & Anon Key (Pre-configured)
 ├── supabase_schema.sql               # Full PostgreSQL tables, triggers & RLS policies
-├── supabase_seed.sql                 # Sample test listings & users for instant demo
+├── supabase_seed.sql                 # Clean slate admin initialization script
 ├── pubspec.yaml                      # Dependencies & asset configuration
 └── lib/
     ├── main.dart                     # App entry point with MultiProvider & Supabase init
@@ -70,7 +82,7 @@ FlipCash/
     │   │   ├── app_constants.dart    # Constants, defaults & safety guidelines
     │   │   └── app_theme.dart        # Material 3 typography & component styling
     │   ├── services/
-    │   │   └── supabase_service.dart # Central Supabase API & mock fallback engine
+    │   │   └── supabase_service.dart # Real Supabase API, Auth & Storage engine
     │   └── utils/
     │       ├── currency_formatter.dart # INR (₹) formatting with Indian numbering
     │       └── location_helper.dart  # Haversine distance, travel time & maps navigation
@@ -84,11 +96,11 @@ FlipCash/
     │   ├── request_provider.dart     # Listings, proximity radar & matching state
     │   └── admin_provider.dart       # Admin moderation & platform analytics state
     └── screens/
-        ├── splash_screen.dart        # Animated splash screen
+        ├── splash_screen.dart        # Animated splash screen with role-based routing
         ├── auth/
-        │   └── login_screen.dart     # Google Sign-In & Email authentication
+        │   └── login_screen.dart     # Clean Login & Sign-up (Separate user / admin routes)
         ├── home/
-        │   ├── home_dashboard_screen.dart # Main app dashboard & navigation
+        │   ├── home_dashboard_screen.dart # User dashboard & bottom nav
         │   └── widgets/
         │       ├── quick_stats_banner.dart
         │       ├── active_request_card.dart
@@ -102,10 +114,10 @@ FlipCash/
         │       ├── interactive_radar_map.dart # Custom radar canvas painter
         │       └── request_detail_sheet.dart  # Peer inspection modal
         ├── profile/
-        │   ├── user_profile_screen.dart     # Profile, trust score & safety rules
-        │   └── edit_profile_screen.dart     # Profile updater
+        │   ├── user_profile_screen.dart     # Profile, trust score & photo upload
+        │   └── edit_profile_screen.dart     # Profile & photo updater
         └── admin/
-            └── admin_dashboard_screen.dart  # Admin dashboard & moderation tools
+            └── admin_dashboard_screen.dart  # Dedicated Admin dashboard & moderation tools
 ```
 
 ---
@@ -115,25 +127,18 @@ FlipCash/
 1. Open your [Supabase Dashboard](https://supabase.com/dashboard/project/vronmezuytwqhpgukmlm).
 2. Go to the **SQL Editor** tab on the left sidebar.
 3. Open `supabase_schema.sql` located in this project folder, paste its contents into the SQL Editor, and click **Run**.
-4. *(Optional for demo data)* Open `supabase_seed.sql` and run it to populate active test requests in Bengaluru/Indiranagar/Koramangala.
+4. Run `supabase_seed.sql` to clean any legacy dummy records and ensure the admin configuration.
 
 ---
 
 ## 📱 Running the Application
-
-Ensure Flutter SDK is on your PATH, then run:
 
 ```bash
 # 1. Install dependencies
 flutter pub get
 
 # 2. Run the application
+flutter run -d edge
+# or on mobile emulator / physical device:
 flutter run
 ```
-
----
-
-## 🔒 Safety & Scam Prevention Principles
-- **No in-app escrow or payment credentials held.**
-- **Meetup locations must always be well-lit, high-footfall public venues (Cafes, Metro Stations, Malls).**
-- **Handshake Verification PIN:** The cash giver does not hand over physical paper cash until the cash receiver verifies the digital transfer directly in their banking app.

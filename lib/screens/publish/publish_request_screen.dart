@@ -72,17 +72,28 @@ class _PublishRequestScreenState extends State<PublishRequestScreen> {
       return;
     }
 
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final user = auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to publish a request'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
 
-    final auth = Provider.of<AuthProvider>(context, listen: false);
     final reqProv = Provider.of<RequestProvider>(context, listen: false);
 
     final amountVal = double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0.0;
 
     final success = await reqProv.publishRequest(
-      userId: auth.currentUser?.id ?? AppConstants.demoUserId,
+      userId: user.id,
       exchangeType: _exchangeType,
       amount: amountVal,
       preferredPaymentMethods: _selectedPayments,
@@ -92,7 +103,7 @@ class _PublishRequestScreenState extends State<PublishRequestScreen> {
       meetupPreference: _meetupPrefController.text.trim(),
       notes: _notesController.text.trim(),
       expirationMinutes: _selectedExpirationMinutes,
-      creatorProfile: auth.currentUser,
+      creatorProfile: user,
     );
 
     setState(() {

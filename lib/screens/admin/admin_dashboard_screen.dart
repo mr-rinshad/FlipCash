@@ -7,6 +7,8 @@ import '../../models/exchange_request.dart';
 import '../../models/user_profile.dart';
 import '../../models/safety_report.dart';
 import '../../providers/admin_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../auth/login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -65,6 +67,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Data',
+            onPressed: () {
+              admin.loadAdminData();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: AppColors.danger),
+            tooltip: 'Sign Out Admin',
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              await auth.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,

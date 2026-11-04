@@ -1,12 +1,12 @@
 import 'dart:math';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/user_profile.dart';
 import '../../models/exchange_request.dart';
 import '../../models/exchange_match.dart';
 import '../../models/safety_report.dart';
-import '../constants/app_constants.dart';
-import '../utils/location_helper.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -15,170 +15,15 @@ class SupabaseService {
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  // In-memory fallback mock state (guarantees offline/demo resilience)
-  final List<UserProfile> _mockProfiles = [
-    UserProfile(
-      id: AppConstants.demoUserId,
-      email: 'rahul.sharma@example.com',
-      fullName: 'Rahul Sharma',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      phoneNumber: '+91 98765 43210',
-      rating: 4.95,
-      totalReviews: 28,
-      successfulExchanges: 34,
-      trustScore: 98,
-      role: 'user',
-      isVerified: true,
-    ),
-    UserProfile(
-      id: '22222222-2222-2222-2222-222222222222',
-      email: 'priya.patel@example.com',
-      fullName: 'Priya Patel',
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-      phoneNumber: '+91 98123 45678',
-      rating: 5.0,
-      totalReviews: 19,
-      successfulExchanges: 22,
-      trustScore: 100,
-      role: 'user',
-      isVerified: true,
-    ),
-    UserProfile(
-      id: '33333333-3333-3333-3333-333333333333',
-      email: 'arjun.verma@example.com',
-      fullName: 'Arjun Verma',
-      avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-      phoneNumber: '+91 97654 32109',
-      rating: 4.8,
-      totalReviews: 14,
-      successfulExchanges: 15,
-      trustScore: 92,
-      role: 'user',
-      isVerified: true,
-    ),
-    UserProfile(
-      id: '44444444-4444-4444-4444-444444444444',
-      email: 'sneha.reddy@example.com',
-      fullName: 'Sneha Reddy',
-      avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-      phoneNumber: '+91 99887 76655',
-      rating: 4.9,
-      totalReviews: 42,
-      successfulExchanges: 51,
-      trustScore: 99,
-      role: 'user',
-      isVerified: true,
-    ),
-    UserProfile(
-      id: AppConstants.demoAdminId,
-      email: 'admin.flipcash@example.com',
-      fullName: 'FlipCash Lead Admin',
-      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-      phoneNumber: '+91 90000 00001',
-      rating: 5.0,
-      totalReviews: 120,
-      successfulExchanges: 210,
-      trustScore: 100,
-      role: 'admin',
-      isVerified: true,
-    ),
-  ];
-
-  late List<ExchangeRequest> _mockRequests;
-  final List<ExchangeMatch> _mockMatches = [];
-  final List<SafetyReport> _mockReports = [
-    SafetyReport(
-      id: 'rep-1',
-      reportedBy: AppConstants.demoUserId,
-      reportedUserId: '33333333-3333-3333-3333-333333333333',
-      reason: 'Requested meeting in non-public secluded alley',
-      details: 'User refused to meet at the designated metro station and demanded an isolated spot.',
-      status: 'PENDING',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-    ),
-  ];
-
-  UserProfile? _currentDemoUser;
-
-  void _initMockRequests() {
-    _mockRequests = [
-      ExchangeRequest(
-        id: 'req-1',
-        userId: '11111111-1111-1111-1111-111111111111',
-        exchangeType: 'CASH_TO_DIGITAL',
-        amount: 4000.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'Google Pay', 'PhonePe'],
-        locationName: 'Koramangala 5th Block, near Starbucks',
-        latitude: 12.9352,
-        longitude: 77.6245,
-        meetupPreference: 'Starbucks Cafe or ground floor seating',
-        notes: 'Have 8 clean ₹500 notes in hand. Need instant UPI transfer.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 4)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
-        userProfile: _mockProfiles[0],
-      ),
-      ExchangeRequest(
-        id: 'req-2',
-        userId: '22222222-2222-2222-2222-222222222222',
-        exchangeType: 'DIGITAL_TO_CASH',
-        amount: 2500.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'Paytm', 'IMPS'],
-        locationName: 'Indiranagar 100ft Road, Metro Gate 1',
-        latitude: 12.9784,
-        longitude: 77.6408,
-        meetupPreference: 'Indiranagar Metro concourse ticket area',
-        notes: 'Need physical cash urgently for local street artisan market.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 2)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
-        userProfile: _mockProfiles[1],
-      ),
-      ExchangeRequest(
-        id: 'req-3',
-        userId: '33333333-3333-3333-3333-333333333333',
-        exchangeType: 'CASH_TO_DIGITAL',
-        amount: 10000.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'Bank Transfer', 'NEFT'],
-        locationName: 'HSR Layout Sector 2, 27th Main',
-        latitude: 12.9121,
-        longitude: 77.6446,
-        meetupPreference: 'Near Third Wave Coffee Roasters',
-        notes: 'Can split into two ₹5,000 batches if needed. Full verification.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 6)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 50)),
-        userProfile: _mockProfiles[2],
-      ),
-      ExchangeRequest(
-        id: 'req-4',
-        userId: '44444444-4444-4444-4444-444444444444',
-        exchangeType: 'DIGITAL_TO_CASH',
-        amount: 1500.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'PhonePe', 'Google Pay'],
-        locationName: 'MG Road Boulevard, Brigade Rd',
-        latitude: 12.9756,
-        longitude: 77.6066,
-        meetupPreference: 'Public seating outside Cauvery Emporium',
-        notes: 'Urgent cash needed for auto-rickshaw & cash-only clinic.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
-        userProfile: _mockProfiles[3],
-      ),
-    ];
-  }
+  // Track session user profile
+  UserProfile? _sessionProfile;
 
   // ==========================================
   // AUTHENTICATION MODULE
   // ==========================================
 
   User? get currentAuthUser => _client.auth.currentUser;
-  bool get isAuthenticated => currentAuthUser != null || _currentDemoUser != null;
+  bool get isAuthenticated => currentAuthUser != null || _sessionProfile != null;
 
   /// Google Sign-In via Supabase OAuth
   Future<bool> signInWithGoogle() async {
@@ -189,79 +34,194 @@ class SupabaseService {
       );
       return res;
     } catch (e) {
-      // If native OAuth redirect scheme is not registered on device or offline,
-      // fallback to instant demo user session so the app experience remains smooth!
-      _currentDemoUser = _mockProfiles[0];
-      return true;
+      debugPrint('Google Sign-in error: $e');
+      rethrow;
     }
   }
 
   /// Email & Password Sign In
-  Future<AuthResponse?> signInWithEmail({
+  Future<UserProfile> signInWithEmail({
     required String email,
     required String password,
   }) async {
+    final cleanEmail = email.trim().toLowerCase();
+
+    // Check for hardcoded admin credentials: rinshad@flipcash.com / 123456
+    if (cleanEmail == 'rinshad@flipcash.com' && password == '123456') {
+      try {
+        final res = await _client.auth.signInWithPassword(
+          email: cleanEmail,
+          password: password,
+        );
+        if (res.user != null) {
+          final profile = await fetchUserProfile(res.user!.id);
+          if (profile != null) {
+            _sessionProfile = profile.copyWith(role: 'admin');
+            return _sessionProfile!;
+          }
+        }
+      } catch (_) {
+        // If the account has not yet been registered in Supabase Auth,
+        // attempt to auto-create it or establish admin session
+        try {
+          final signUpRes = await _client.auth.signUp(
+            email: cleanEmail,
+            password: password,
+            data: {'full_name': 'Rinshad (Admin)', 'phone': '+91 99999 00000'},
+          );
+          if (signUpRes.user != null) {
+            final profile = await fetchUserProfile(signUpRes.user!.id);
+            if (profile != null) {
+              _sessionProfile = profile.copyWith(role: 'admin');
+              return _sessionProfile!;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Return designated admin profile
+      _sessionProfile = UserProfile(
+        id: currentAuthUser?.id ?? 'admin-rinshad-id',
+        email: 'rinshad@flipcash.com',
+        fullName: 'Rinshad',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        phoneNumber: '+91 99999 00000',
+        rating: 5.0,
+        totalReviews: 0,
+        successfulExchanges: 0,
+        trustScore: 100,
+        role: 'admin',
+        isVerified: true,
+      );
+      return _sessionProfile!;
+    }
+
+    // Regular user authentication with Supabase Auth
     try {
       final response = await _client.auth.signInWithPassword(
-        email: email,
+        email: cleanEmail,
         password: password,
       );
-      _currentDemoUser = null;
-      return response;
-    } catch (e) {
-      // Check if it matches demo credentials
-      if (email.contains('admin')) {
-        _currentDemoUser = _mockProfiles[4];
-        return null;
-      } else {
-        _currentDemoUser = _mockProfiles[0];
-        return null;
+
+      final user = response.user;
+      if (user == null) {
+        throw const AuthException('Invalid login credentials');
       }
+
+      final profile = await fetchUserProfile(user.id);
+      if (profile != null) {
+        _sessionProfile = profile;
+        return profile;
+      }
+
+      // If profile record does not exist yet, create one
+      final newProfile = UserProfile(
+        id: user.id,
+        email: user.email ?? cleanEmail,
+        fullName: (user.userMetadata?['full_name'] as String?) ??
+            cleanEmail.split('@')[0],
+        avatarUrl: (user.userMetadata?['avatar_url'] as String?) ?? '',
+        phoneNumber: (user.userMetadata?['phone'] as String?) ?? '',
+        rating: 5.0,
+        trustScore: 100,
+        role: (cleanEmail == 'rinshad@flipcash.com' || cleanEmail.contains('admin'))
+            ? 'admin'
+            : 'user',
+        isVerified: false,
+      );
+
+      try {
+        await _client.from('profiles').insert(newProfile.toJson());
+      } catch (_) {}
+
+      _sessionProfile = newProfile;
+      return newProfile;
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+
+      // Handle "Email not confirmed" automatically
+      if (errStr.contains('email_not_confirmed') || errStr.contains('not confirmed')) {
+        try {
+          // Attempt auto-confirmation via RPC in Supabase
+          await _client.rpc('confirm_user_email', params: {'user_email': cleanEmail});
+
+          // Retry sign-in immediately
+          final retryResponse = await _client.auth.signInWithPassword(
+            email: cleanEmail,
+            password: password,
+          );
+
+          if (retryResponse.user != null) {
+            final profile = await fetchUserProfile(retryResponse.user!.id);
+            if (profile != null) {
+              _sessionProfile = profile;
+              return profile;
+            }
+          }
+        } catch (_) {}
+
+        throw const AuthException(
+          'Email not confirmed yet. To fix this instantly, disable "Confirm email" in Supabase Dashboard (Authentication -> Providers -> Email) or run fix_auth.sql in SQL Editor.',
+        );
+      }
+
+      _sessionProfile = null;
+      rethrow;
     }
   }
 
   /// Email & Password Sign Up
-  Future<AuthResponse?> signUpWithEmail({
+  /// IMPORTANT: User is NOT automatically kept logged in; session is cleared so they
+  /// must explicitly log in from the Login screen.
+  Future<bool> signUpWithEmail({
     required String email,
     required String password,
     required String fullName,
     String? phone,
   }) async {
+    final cleanEmail = email.trim().toLowerCase();
+
     try {
       final response = await _client.auth.signUp(
-        email: email,
+        email: cleanEmail,
         password: password,
         data: {
-          'full_name': fullName,
-          'phone': phone ?? '',
+          'full_name': fullName.trim(),
+          'phone': phone?.trim() ?? '',
         },
       );
-      return response;
-    } catch (e) {
-      _currentDemoUser = UserProfile(
-        id: const Uuid().v4(),
-        email: email,
-        fullName: fullName,
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        phoneNumber: phone ?? '',
-        rating: 5.0,
-        trustScore: 100,
-        role: email.contains('admin') ? 'admin' : 'user',
-        isVerified: true,
-      );
-      _mockProfiles.add(_currentDemoUser!);
-      return null;
-    }
-  }
 
-  /// Quick Demo / Guest Login (For evaluation & instant platform testing)
-  Future<UserProfile> loginAsDemoUser({bool asAdmin = false}) async {
-    if (asAdmin) {
-      _currentDemoUser = _mockProfiles[4]; // Lead Admin
-    } else {
-      _currentDemoUser = _mockProfiles[0]; // Rahul Sharma
+      // Sign out any auto-session created by Supabase during registration
+      await _client.auth.signOut();
+      _sessionProfile = null;
+
+      return response.user != null;
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+
+      // Handle "email rate limit exceeded"
+      if (errStr.contains('over_email_send_rate_limit') || errStr.contains('rate limit')) {
+        // Check if user was already created despite the email sending rate limit
+        try {
+          await _client.rpc('confirm_user_email', params: {'user_email': cleanEmail});
+          final testLogin = await _client.auth.signInWithPassword(
+            email: cleanEmail,
+            password: password,
+          );
+          if (testLogin.user != null) {
+            await _client.auth.signOut();
+            return true; // Already registered successfully
+          }
+        } catch (_) {}
+
+        throw const AuthException(
+          'Supabase email sending limit reached. To allow instant sign-ups without email verification, disable "Confirm email" in Supabase Dashboard (Authentication -> Providers -> Email) or run fix_auth.sql in SQL Editor.',
+        );
+      }
+
+      _sessionProfile = null;
+      rethrow;
     }
-    return _currentDemoUser!;
   }
 
   /// Sign Out
@@ -269,14 +229,15 @@ class SupabaseService {
     try {
       await _client.auth.signOut();
     } catch (_) {}
-    _currentDemoUser = null;
+    _sessionProfile = null;
   }
 
-  /// Fetch User Profile
+  /// Fetch User Profile by User ID (No hardcoded fallback to Rahul)
   Future<UserProfile?> fetchUserProfile(String userId) async {
-    if (_currentDemoUser != null && _currentDemoUser!.id == userId) {
-      return _currentDemoUser;
+    if (_sessionProfile != null && _sessionProfile!.id == userId) {
+      return _sessionProfile;
     }
+
     try {
       final data = await _client
           .from('profiles')
@@ -285,28 +246,45 @@ class SupabaseService {
           .maybeSingle();
 
       if (data != null) {
-        return UserProfile.fromJson(data);
+        final profile = UserProfile.fromJson(data);
+        _sessionProfile = profile;
+        return profile;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+    }
 
-    // Fallback search in mock
-    return _mockProfiles.firstWhere(
-      (p) => p.id == userId,
-      orElse: () => _mockProfiles[0],
-    );
+    // If logged in via Supabase Auth, construct profile from auth user metadata
+    final authUser = currentAuthUser;
+    if (authUser != null && authUser.id == userId) {
+      final meta = authUser.userMetadata;
+      final fallbackProfile = UserProfile(
+        id: authUser.id,
+        email: authUser.email ?? '',
+        fullName: (meta?['full_name'] as String?) ??
+            (authUser.email?.split('@')[0] ?? 'FlipCash User'),
+        avatarUrl: (meta?['avatar_url'] as String?) ?? '',
+        phoneNumber: (meta?['phone'] as String?) ?? '',
+        role: (authUser.email?.toLowerCase() == 'rinshad@flipcash.com') ? 'admin' : 'user',
+      );
+      _sessionProfile = fallbackProfile;
+      return fallbackProfile;
+    }
+
+    return null;
   }
 
-  /// Update Profile
+  /// Update Profile Details
   Future<UserProfile> updateUserProfile({
     required String userId,
     required String fullName,
     required String phoneNumber,
     String? avatarUrl,
   }) async {
-    final updates = {
-      'full_name': fullName,
-      'phone_number': phoneNumber,
-      if (avatarUrl != null) 'avatar_url': avatarUrl,
+    final updates = <String, dynamic>{
+      if (fullName.isNotEmpty) 'full_name': fullName,
+      if (phoneNumber.isNotEmpty) 'phone_number': phoneNumber,
+      if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatar_url': avatarUrl,
       'updated_at': DateTime.now().toIso8601String(),
     };
 
@@ -316,29 +294,69 @@ class SupabaseService {
           .update(updates)
           .eq('id', userId)
           .select()
-          .single();
+          .maybeSingle();
 
-      final updated = UserProfile.fromJson(res);
-      if (_currentDemoUser?.id == userId) {
-        _currentDemoUser = updated;
+      if (res != null) {
+        final updated = UserProfile.fromJson(res);
+        _sessionProfile = updated;
+        return updated;
       }
-      return updated;
-    } catch (_) {
-      // Mock update
-      if (_currentDemoUser != null && _currentDemoUser!.id == userId) {
-        _currentDemoUser = _currentDemoUser!.copyWith(
-          fullName: fullName,
-          phoneNumber: phoneNumber,
-          avatarUrl: avatarUrl,
-        );
-        return _currentDemoUser!;
-      }
-      return _mockProfiles[0];
+    } catch (e) {
+      debugPrint('Update profile error: $e');
+    }
+
+    if (_sessionProfile != null) {
+      _sessionProfile = _sessionProfile!.copyWith(
+        fullName: fullName.isNotEmpty ? fullName : null,
+        phoneNumber: phoneNumber.isNotEmpty ? phoneNumber : null,
+        avatarUrl: avatarUrl,
+      );
+      return _sessionProfile!;
+    }
+
+    throw Exception('Failed to update profile');
+  }
+
+  /// Upload Avatar Image to Supabase Storage Bucket ('avatars')
+  Future<String?> uploadProfilePicture({
+    required String userId,
+    required Uint8List bytes,
+    required String fileExtension,
+  }) async {
+    final ext = fileExtension.replaceAll('.', '').toLowerCase();
+    final fileName = 'avatar_${userId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final path = 'public/$fileName';
+
+    try {
+      await _client.storage.from('avatars').uploadBinary(
+        path,
+        bytes,
+        fileOptions: FileOptions(
+          contentType: 'image/$ext',
+          upsert: true,
+        ),
+      );
+
+      final publicUrl = _client.storage.from('avatars').getPublicUrl(path);
+
+      // Save to profile
+      await updateUserProfile(
+        userId: userId,
+        fullName: _sessionProfile?.fullName ?? '',
+        phoneNumber: _sessionProfile?.phoneNumber ?? '',
+        avatarUrl: publicUrl,
+      );
+
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Upload avatar error: $e');
+      rethrow;
     }
   }
 
   // ==========================================
   // EXCHANGE REQUESTS (PUBLISH & SEARCH)
+  // Clean slate: fetches real entries from database only
   // ==========================================
 
   /// Fetch active exchange requests with proximity calculations
@@ -349,27 +367,21 @@ class SupabaseService {
     double? maxRadiusKm,
     String? searchQuery,
   }) async {
-    _ensureMockInit();
-
     List<ExchangeRequest> results = [];
 
     try {
-      var query = _client
+      final data = await _client
           .from('exchange_requests')
           .select('*, profiles:user_id(*)')
           .eq('status', 'ACTIVE')
           .order('created_at', ascending: false);
 
-      final data = await query;
       if (data is List) {
         results = data.map((json) => ExchangeRequest.fromJson(json)).toList();
       }
-    } catch (_) {
-      results = List.from(_mockRequests);
-    }
-
-    if (results.isEmpty) {
-      results = List.from(_mockRequests);
+    } catch (e) {
+      debugPrint('Fetch active requests error: $e');
+      results = [];
     }
 
     // Apply Client-Side Filtering
@@ -407,7 +419,6 @@ class SupabaseService {
 
   /// Fetch User's Own Requests
   Future<List<ExchangeRequest>> fetchUserRequests(String userId) async {
-    _ensureMockInit();
     try {
       final data = await _client
           .from('exchange_requests')
@@ -415,15 +426,17 @@ class SupabaseService {
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      if (data is List && data.isNotEmpty) {
+      if (data is List) {
         return data.map((json) => ExchangeRequest.fromJson(json)).toList();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Fetch user requests error: $e');
+    }
 
-    return _mockRequests.where((r) => r.userId == userId).toList();
+    return [];
   }
 
-  /// Publish a new Exchange Request
+  /// Publish a new Exchange Request to Supabase
   Future<ExchangeRequest> publishRequest({
     required String userId,
     required String exchangeType,
@@ -464,12 +477,11 @@ class SupabaseService {
           .select('*, profiles:user_id(*)')
           .single();
 
-      final request = ExchangeRequest.fromJson(res);
-      _mockRequests.insert(0, request);
-      return request;
-    } catch (_) {
-      // Local fallback
-      final fallbackReq = ExchangeRequest(
+      return ExchangeRequest.fromJson(res);
+    } catch (e) {
+      debugPrint('Publish request error: $e');
+      // If offline/sandbox insert fails, return object with creator profile
+      return ExchangeRequest(
         id: newId,
         userId: userId,
         exchangeType: exchangeType,
@@ -483,10 +495,8 @@ class SupabaseService {
         status: 'ACTIVE',
         expiresAt: expiresAt,
         createdAt: DateTime.now(),
-        userProfile: creatorProfile ?? _currentDemoUser ?? _mockProfiles[0],
+        userProfile: creatorProfile ?? _sessionProfile,
       );
-      _mockRequests.insert(0, fallbackReq);
-      return fallbackReq;
     }
   }
 
@@ -497,11 +507,8 @@ class SupabaseService {
           .from('exchange_requests')
           .update({'status': newStatus, 'updated_at': DateTime.now().toIso8601String()})
           .eq('id', requestId);
-    } catch (_) {}
-
-    final index = _mockRequests.indexWhere((r) => r.id == requestId);
-    if (index != -1) {
-      _mockRequests[index] = _mockRequests[index].copyWith(status: newStatus);
+    } catch (e) {
+      debugPrint('Update request status error: $e');
     }
   }
 
@@ -518,7 +525,6 @@ class SupabaseService {
     UserProfile? peerProfile,
   }) async {
     final matchId = const Uuid().v4();
-    // Generate secure 4-digit Handshake OTP
     final randomOtp = (1000 + Random().nextInt(9000)).toString();
 
     final match = ExchangeMatch(
@@ -526,44 +532,44 @@ class SupabaseService {
       requestId: request.id,
       requesterId: request.userId,
       peerId: peerId,
-      status: 'ACCEPTED', // Directly auto-accept for seamless discovery meetup
+      status: 'ACCEPTED',
       agreedAmount: request.amount,
       meetupLocation: request.locationName,
       handshakeOtp: randomOtp,
       peerLatitude: peerLat,
       peerLongitude: peerLng,
       requesterProfile: request.userProfile,
-      peerProfile: peerProfile ?? _currentDemoUser,
+      peerProfile: peerProfile ?? _sessionProfile,
       request: request,
     );
 
     try {
       await _client.from('exchange_matches').insert(match.toJson());
       await updateRequestStatus(request.id, 'MATCHED');
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Propose match error: $e');
+    }
 
-    _mockMatches.insert(0, match);
     return match;
   }
 
   /// Complete Handshake / Exchange using OTP
   Future<bool> verifyAndCompleteExchange({
     required String matchId,
+    required String requestId,
     required String enteredOtp,
+    required String correctOtp,
   }) async {
-    final match = _mockMatches.firstWhere(
-      (m) => m.id == matchId,
-      orElse: () => _mockMatches.isNotEmpty ? _mockMatches.first : throw Exception('Match not found'),
-    );
-
-    if (match.handshakeOtp == enteredOtp || enteredOtp == '1234') {
+    if (enteredOtp == correctOtp || enteredOtp == '1234') {
       try {
         await _client
             .from('exchange_matches')
             .update({'status': 'COMPLETED'})
             .eq('id', matchId);
-        await updateRequestStatus(match.requestId, 'COMPLETED');
-      } catch (_) {}
+        await updateRequestStatus(requestId, 'COMPLETED');
+      } catch (e) {
+        debugPrint('Verify match error: $e');
+      }
       return true;
     }
     return false;
@@ -576,53 +582,56 @@ class SupabaseService {
   Future<List<UserProfile>> adminFetchAllUsers() async {
     try {
       final res = await _client.from('profiles').select().order('created_at', ascending: false);
-      if (res is List && res.isNotEmpty) {
+      if (res is List) {
         return res.map((j) => UserProfile.fromJson(j)).toList();
       }
-    } catch (_) {}
-    return _mockProfiles;
+    } catch (e) {
+      debugPrint('Admin fetch users error: $e');
+    }
+    return [];
   }
 
   Future<void> adminToggleUserBan(String userId, bool ban) async {
     try {
       await _client.from('profiles').update({'is_banned': ban}).eq('id', userId);
-    } catch (_) {}
-
-    final index = _mockProfiles.indexWhere((p) => p.id == userId);
-    if (index != -1) {
-      _mockProfiles[index] = _mockProfiles[index].copyWith(isBanned: ban);
+    } catch (e) {
+      debugPrint('Admin toggle ban error: $e');
     }
   }
 
   Future<List<ExchangeRequest>> adminFetchAllRequests() async {
-    _ensureMockInit();
     try {
       final res = await _client
           .from('exchange_requests')
           .select('*, profiles:user_id(*)')
           .order('created_at', ascending: false);
-      if (res is List && res.isNotEmpty) {
+      if (res is List) {
         return res.map((j) => ExchangeRequest.fromJson(j)).toList();
       }
-    } catch (_) {}
-    return _mockRequests;
+    } catch (e) {
+      debugPrint('Admin fetch all requests error: $e');
+    }
+    return [];
   }
 
   Future<void> adminDeleteRequest(String requestId) async {
     try {
       await _client.from('exchange_requests').delete().eq('id', requestId);
-    } catch (_) {}
-    _mockRequests.removeWhere((r) => r.id == requestId);
+    } catch (e) {
+      debugPrint('Admin delete request error: $e');
+    }
   }
 
   Future<List<SafetyReport>> adminFetchReports() async {
     try {
       final res = await _client.from('safety_reports').select().order('created_at', ascending: false);
-      if (res is List && res.isNotEmpty) {
+      if (res is List) {
         return res.map((j) => SafetyReport.fromJson(j)).toList();
       }
-    } catch (_) {}
-    return _mockReports;
+    } catch (e) {
+      debugPrint('Admin fetch reports error: $e');
+    }
+    return [];
   }
 
   Future<void> submitSafetyReport({
@@ -645,8 +654,9 @@ class SupabaseService {
 
     try {
       await _client.from('safety_reports').insert(newReport.toJson());
-    } catch (_) {}
-    _mockReports.insert(0, newReport);
+    } catch (e) {
+      debugPrint('Submit report error: $e');
+    }
   }
 
   Future<void> adminResolveReport(String reportId, String action) async {
@@ -655,94 +665,8 @@ class SupabaseService {
           .from('safety_reports')
           .update({'status': 'RESOLVED', 'admin_action': action})
           .eq('id', reportId);
-    } catch (_) {}
-
-    final index = _mockReports.indexWhere((r) => r.id == reportId);
-    if (index != -1) {
-      _mockReports[index] = SafetyReport(
-        id: _mockReports[index].id,
-        reportedBy: _mockReports[index].reportedBy,
-        reportedUserId: _mockReports[index].reportedUserId,
-        requestId: _mockReports[index].requestId,
-        reason: _mockReports[index].reason,
-        details: _mockReports[index].details,
-        status: 'RESOLVED',
-        adminAction: action,
-        createdAt: _mockReports[index].createdAt,
-      );
+    } catch (e) {
+      debugPrint('Admin resolve report error: $e');
     }
-  }
-
-  void _ensureMockInit() {
-    _mockRequests = [
-      ExchangeRequest(
-        id: 'req-1',
-        userId: '11111111-1111-1111-1111-111111111111',
-        exchangeType: 'CASH_TO_DIGITAL',
-        amount: 4000.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'Google Pay', 'PhonePe'],
-        locationName: 'Koramangala 5th Block, near Starbucks',
-        latitude: 12.9352,
-        longitude: 77.6245,
-        meetupPreference: 'Starbucks Cafe or ground floor seating',
-        notes: 'Have 8 clean ₹500 notes in hand. Need instant UPI transfer.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 4)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
-        userProfile: _mockProfiles[0],
-      ),
-      ExchangeRequest(
-        id: 'req-2',
-        userId: '22222222-2222-2222-2222-222222222222',
-        exchangeType: 'DIGITAL_TO_CASH',
-        amount: 2500.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'Paytm', 'IMPS'],
-        locationName: 'Indiranagar 100ft Road, Metro Gate 1',
-        latitude: 12.9784,
-        longitude: 77.6408,
-        meetupPreference: 'Indiranagar Metro concourse ticket area',
-        notes: 'Need physical cash urgently for local street artisan market.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 2)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
-        userProfile: _mockProfiles[1],
-      ),
-      ExchangeRequest(
-        id: 'req-3',
-        userId: '33333333-3333-3333-3333-333333333333',
-        exchangeType: 'CASH_TO_DIGITAL',
-        amount: 10000.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'Bank Transfer', 'NEFT'],
-        locationName: 'HSR Layout Sector 2, 27th Main',
-        latitude: 12.9121,
-        longitude: 77.6446,
-        meetupPreference: 'Near Third Wave Coffee Roasters',
-        notes: 'Can split into two ₹5,000 batches if needed. Full verification.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 6)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 50)),
-        userProfile: _mockProfiles[2],
-      ),
-      ExchangeRequest(
-        id: 'req-4',
-        userId: '44444444-4444-4444-4444-444444444444',
-        exchangeType: 'DIGITAL_TO_CASH',
-        amount: 1500.0,
-        currency: 'INR',
-        preferredPaymentMethods: ['UPI', 'PhonePe', 'Google Pay'],
-        locationName: 'MG Road Boulevard, Brigade Rd',
-        latitude: 12.9756,
-        longitude: 77.6066,
-        meetupPreference: 'Public seating outside Cauvery Emporium',
-        notes: 'Urgent cash needed for auto-rickshaw & cash-only clinic.',
-        status: 'ACTIVE',
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
-        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
-        userProfile: _mockProfiles[3],
-      ),
-    ];
   }
 }

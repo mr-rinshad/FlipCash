@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS public.exchange_requests (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexes for lightning fast location & status filtering
+-- Indexes for location & status filtering
 CREATE INDEX IF NOT EXISTS idx_requests_status ON public.exchange_requests(status);
 CREATE INDEX IF NOT EXISTS idx_requests_type ON public.exchange_requests(exchange_type);
 CREATE INDEX IF NOT EXISTS idx_requests_coords ON public.exchange_requests(latitude, longitude);
@@ -143,16 +143,23 @@ BEGIN
         NEW.id,
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-        COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'),
+        COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', ''),
         COALESCE(NEW.raw_user_meta_data->>'phone', ''),
         5.00,
         100,
-        CASE WHEN NEW.email ILIKE '%admin%' THEN 'admin' ELSE 'user' END
+        CASE 
+            WHEN LOWER(NEW.email) = 'rinshad@flipcash.com' OR LOWER(NEW.email) LIKE '%admin%' THEN 'admin' 
+            ELSE 'user' 
+        END
     )
     ON CONFLICT (id) DO UPDATE SET
         email = EXCLUDED.email,
         full_name = COALESCE(public.profiles.full_name, EXCLUDED.full_name),
-        avatar_url = COALESCE(public.profiles.avatar_url, EXCLUDED.avatar_url),
+        avatar_url = CASE WHEN EXCLUDED.avatar_url <> '' THEN EXCLUDED.avatar_url ELSE public.profiles.avatar_url END,
+        role = CASE 
+            WHEN LOWER(EXCLUDED.email) = 'rinshad@flipcash.com' OR LOWER(EXCLUDED.email) LIKE '%admin%' THEN 'admin' 
+            ELSE public.profiles.role 
+        END,
         updated_at = NOW();
     RETURN NEW;
 END;
@@ -163,6 +170,35 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Auto-confirm trigger so users never get blocked by "Email not confirmed"
+CREATE OR REPLACE FUNCTION public.auto_confirm_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.email_confirmed_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_auto_confirm ON auth.users;
+CREATE TRIGGER on_auth_user_auto_confirm
+    BEFORE INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.auto_confirm_new_user();
+
+-- RPC function allowing the app to auto-confirm any user by email
+CREATE OR REPLACE FUNCTION public.confirm_user_email(user_email TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    UPDATE auth.users
+    SET email_confirmed_at = NOW()
+    WHERE LOWER(email) = LOWER(TRIM(user_email));
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.confirm_user_email(TEXT) TO anon, authenticated, service_role;
 
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -175,41 +211,58 @@ ALTER TABLE public.safety_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: Publicly viewable, users can edit own profile, admins can manage all
+DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON public.profiles;
 CREATE POLICY "Profiles are viewable by everyone" 
     ON public.profiles FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile" 
     ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" 
-    ON public.profiles FOR UPDATE USING (auth.uid() = id);
+    ON public.profiles FOR UPDATE USING (auth.uid() = id OR EXISTS (
+        SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+    ));
 
 -- Exchange Requests: Viewable by everyone (if active), owners & admins can edit
+DROP POLICY IF EXISTS "Active requests are viewable by all" ON public.exchange_requests;
 CREATE POLICY "Active requests are viewable by all" 
     ON public.exchange_requests FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert own requests" ON public.exchange_requests;
 CREATE POLICY "Users can insert own requests" 
     ON public.exchange_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own requests" ON public.exchange_requests;
 CREATE POLICY "Users can update own requests" 
-    ON public.exchange_requests FOR UPDATE USING (auth.uid() = user_id);
+    ON public.exchange_requests FOR UPDATE USING (auth.uid() = user_id OR EXISTS (
+        SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+    ));
 
+DROP POLICY IF EXISTS "Users can delete own requests" ON public.exchange_requests;
 CREATE POLICY "Users can delete own requests" 
-    ON public.exchange_requests FOR DELETE USING (auth.uid() = user_id);
+    ON public.exchange_requests FOR DELETE USING (auth.uid() = user_id OR EXISTS (
+        SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
+    ));
 
--- Matches: Parties involved can view and update
+-- Matches
+DROP POLICY IF EXISTS "Match participants can view match" ON public.exchange_matches;
 CREATE POLICY "Match participants can view match" 
     ON public.exchange_matches FOR SELECT 
     USING (auth.uid() = requester_id OR auth.uid() = peer_id);
 
+DROP POLICY IF EXISTS "Users can create matches" ON public.exchange_matches;
 CREATE POLICY "Users can create matches" 
     ON public.exchange_matches FOR INSERT WITH CHECK (auth.uid() = peer_id OR auth.uid() = requester_id);
 
+DROP POLICY IF EXISTS "Match participants can update match" ON public.exchange_matches;
 CREATE POLICY "Match participants can update match" 
     ON public.exchange_matches FOR UPDATE 
     USING (auth.uid() = requester_id OR auth.uid() = peer_id);
 
--- Messages: Participants can read and write
+-- Messages
+DROP POLICY IF EXISTS "Message viewable by match participants" ON public.exchange_messages;
 CREATE POLICY "Message viewable by match participants" 
     ON public.exchange_messages FOR SELECT 
     USING (EXISTS (
@@ -218,37 +271,55 @@ CREATE POLICY "Message viewable by match participants"
         AND (requester_id = auth.uid() OR peer_id = auth.uid())
     ));
 
+DROP POLICY IF EXISTS "Message insertable by match participants" ON public.exchange_messages;
 CREATE POLICY "Message insertable by match participants" 
     ON public.exchange_messages FOR INSERT 
     WITH CHECK (auth.uid() = sender_id);
 
--- Reports: Anyone authenticated can submit, admins can view & update
+-- Reports
+DROP POLICY IF EXISTS "Anyone can submit a safety report" ON public.safety_reports;
 CREATE POLICY "Anyone can submit a safety report" 
     ON public.safety_reports FOR INSERT WITH CHECK (auth.uid() = reported_by);
 
+DROP POLICY IF EXISTS "Admins or reporters can view reports" ON public.safety_reports;
 CREATE POLICY "Admins or reporters can view reports" 
     ON public.safety_reports FOR SELECT 
     USING (auth.uid() = reported_by OR EXISTS (
         SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
     ));
 
+DROP POLICY IF EXISTS "Admins can update reports" ON public.safety_reports;
 CREATE POLICY "Admins can update reports" 
     ON public.safety_reports FOR UPDATE 
     USING (EXISTS (
         SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
     ));
 
--- Reviews: Viewable by all, insertable by participants
+-- Reviews
+DROP POLICY IF EXISTS "Reviews viewable by everyone" ON public.reviews;
 CREATE POLICY "Reviews viewable by everyone" 
     ON public.reviews FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Reviewer can insert review" ON public.reviews;
 CREATE POLICY "Reviewer can insert review" 
     ON public.reviews FOR INSERT WITH CHECK (auth.uid() = reviewer_id);
 
--- ==============================================================================
--- REAL-TIME SUBSCRIPTION ENABLER
--- ==============================================================================
--- Enable Realtime for requests and matches
-ALTER PUBLICATION supabase_realtime ADD TABLE public.exchange_requests;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.exchange_matches;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.exchange_messages;
+-- Storage bucket for avatar image uploads
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Avatar images are publicly accessible" ON storage.objects;
+CREATE POLICY "Avatar images are publicly accessible"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'avatars');
+
+DROP POLICY IF EXISTS "Authenticated users can upload avatar images" ON storage.objects;
+CREATE POLICY "Authenticated users can upload avatar images"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'avatars');
+
+DROP POLICY IF EXISTS "Users can update own avatar images" ON storage.objects;
+CREATE POLICY "Users can update own avatar images"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'avatars');

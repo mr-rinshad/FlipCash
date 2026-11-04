@@ -50,7 +50,6 @@ class AppConstants {
     'Do not carry unusually large sums of physical cash without accompaniment.',
   ];
 
-  // Demo User IDs
-  static const String demoUserId = '11111111-1111-1111-1111-111111111111';
-  static const String demoAdminId = '55555555-5555-5555-5555-555555555555';
+  // Designated Administrator Email
+  static const String adminEmail = 'rinshad@flipcash.com';
 }

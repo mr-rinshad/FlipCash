@@ -83,7 +83,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       const SearchDiscoveryScreen(),
       _buildMyRequestsView(user, reqProv),
       const UserProfileScreen(),
-      if (user?.isAdmin ?? false) const AdminDashboardScreen(),
     ];
 
     return Scaffold(
@@ -145,12 +144,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               selectedIcon: Icon(Icons.person_rounded, color: AppColors.primary),
               label: 'Profile',
             ),
-            if (user?.isAdmin ?? false)
-              const NavigationDestination(
-                icon: Icon(Icons.admin_panel_settings_outlined),
-                selectedIcon: Icon(Icons.admin_panel_settings_rounded, color: AppColors.primary),
-                label: 'Admin',
-              ),
           ],
         ),
       ),

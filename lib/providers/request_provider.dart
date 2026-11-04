@@ -215,7 +215,9 @@ class RequestProvider extends ChangeNotifier {
     if (_currentActiveMatch == null) return false;
     final success = await _supabaseService.verifyAndCompleteExchange(
       matchId: _currentActiveMatch!.id,
+      requestId: _currentActiveMatch!.requestId,
       enteredOtp: otp,
+      correctOtp: _currentActiveMatch!.handshakeOtp,
     );
     if (success) {
       _activeRequests.removeWhere((r) => r.id == _currentActiveMatch!.requestId);

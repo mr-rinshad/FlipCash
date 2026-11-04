@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/supabase_service.dart';
 import '../models/user_profile.dart';
 
@@ -26,11 +28,11 @@ class AuthProvider extends ChangeNotifier {
       if (authUser != null) {
         _currentUser = await _supabaseService.fetchUserProfile(authUser.id);
       } else {
-        // Start with default demo user so user immediately experiences the platform
-        _currentUser = await _supabaseService.loginAsDemoUser(asAdmin: false);
+        _currentUser = null;
       }
     } catch (e) {
       _errorMessage = e.toString();
+      _currentUser = null;
     } finally {
       _setLoading(false);
     }
@@ -45,8 +47,6 @@ class AuthProvider extends ChangeNotifier {
         final authUser = _supabaseService.currentAuthUser;
         if (authUser != null) {
           _currentUser = await _supabaseService.fetchUserProfile(authUser.id);
-        } else {
-          _currentUser = await _supabaseService.loginAsDemoUser(asAdmin: false);
         }
         notifyListeners();
         return true;
@@ -68,22 +68,15 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     try {
-      final res = await _supabaseService.signInWithEmail(
+      final profile = await _supabaseService.signInWithEmail(
         email: email,
         password: password,
       );
-      if (res?.user != null) {
-        _currentUser = await _supabaseService.fetchUserProfile(res!.user!.id);
-      } else {
-        // Handled in mock fallback
-        _currentUser = await _supabaseService.loginAsDemoUser(
-          asAdmin: email.toLowerCase().contains('admin'),
-        );
-      }
+      _currentUser = profile;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Login failed: $e';
+      _errorMessage = _formatErrorMessage(e);
       notifyListeners();
       return false;
     } finally {
@@ -91,6 +84,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Post-Registration: Registers the user and keeps them logged OUT so they must
+  /// enter their credentials on the Login screen.
   Future<bool> signUpWithEmail({
     required String email,
     required String password,
@@ -100,21 +95,18 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     try {
-      final res = await _supabaseService.signUpWithEmail(
+      final success = await _supabaseService.signUpWithEmail(
         email: email,
         password: password,
         fullName: fullName,
         phone: phone,
       );
-      if (res?.user != null) {
-        _currentUser = await _supabaseService.fetchUserProfile(res!.user!.id);
-      } else {
-        _currentUser = await _supabaseService.fetchUserProfile(email);
-      }
+      // Explicitly ensure user is logged out after registration
+      _currentUser = null;
       notifyListeners();
-      return true;
+      return success;
     } catch (e) {
-      _errorMessage = 'Sign Up failed: $e';
+      _errorMessage = _formatErrorMessage(e);
       notifyListeners();
       return false;
     } finally {
@@ -122,14 +114,22 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loginAsDemo({bool asAdmin = false}) async {
-    _setLoading(true);
-    try {
-      _currentUser = await _supabaseService.loginAsDemoUser(asAdmin: asAdmin);
-      notifyListeners();
-    } finally {
-      _setLoading(false);
+  String _formatErrorMessage(dynamic error) {
+    if (error is AuthException) {
+      return error.message;
     }
+    final str = error.toString();
+    final msgMatch = RegExp(r'message:\s*([^,)]+)').firstMatch(str);
+    if (msgMatch != null && msgMatch.group(1) != null) {
+      return msgMatch.group(1)!.trim();
+    }
+    return str
+        .replaceAll('AuthApiException', '')
+        .replaceAll('AuthException', '')
+        .replaceAll('Exception:', '')
+        .replaceAll('(', '')
+        .replaceAll(')', '')
+        .trim();
   }
 
   Future<bool> updateProfile({
@@ -150,6 +150,37 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = 'Failed to update profile: $e';
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Upload new avatar photo from gallery or camera
+  Future<bool> uploadProfilePicture(XFile imageFile) async {
+    if (_currentUser == null) return false;
+    _setLoading(true);
+    try {
+      final bytes = await imageFile.readAsBytes();
+      final ext = imageFile.name.contains('.')
+          ? imageFile.name.split('.').last
+          : 'jpg';
+
+      final publicUrl = await _supabaseService.uploadProfilePicture(
+        userId: _currentUser!.id,
+        bytes: bytes,
+        fileExtension: ext,
+      );
+
+      if (publicUrl != null) {
+        _currentUser = _currentUser!.copyWith(avatarUrl: publicUrl);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _errorMessage = 'Failed to upload photo: $e';
       notifyListeners();
       return false;
     } finally {
